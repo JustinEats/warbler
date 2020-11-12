@@ -128,8 +128,8 @@ def list_users():
     """
 
     search = request.args.get('q')
-
-    if not search:
+    
+    if not search: #if nothing is inputted then:**
         users = User.query.all()
     else:
         users = User.query.filter(User.username.like(f"%{search}%")).all()
@@ -211,8 +211,25 @@ def stop_following(follow_id):
 @app.route('/users/profile', methods=["GET", "POST"])
 def profile():
     """Update profile for current user."""
-
-    # IMPLEMENT THIS
+    if not g.user:
+        flash("Unauthorized access.", "danger")
+        return redirect("/")
+    form = UserAddForm()
+    user = g.user
+    if form.validate_on_submit():
+        user.username = form.username.data
+        user.email = form.email.data
+        user.image_url = form.image_url.data
+        if User.authenticate(form.username.data, form.password.data):
+            editted_user = User(username=user.username, 
+                                email=user.email, 
+                                image_url=form.image_url.data or User.image_url.default.arg
+                                )
+            db.session.commit()
+            return redirect(f'/users/{g.user.id}')
+        else:
+            form.password.errors = ['Wrong password kiddo.']
+    return render_template('users/edit.html', form=form, user=user)
 
 
 @app.route('/users/delete', methods=["POST"])
