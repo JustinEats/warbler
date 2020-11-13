@@ -217,14 +217,11 @@ def profile():
     form = UserAddForm()
     user = g.user
     if form.validate_on_submit():
-        user.username = form.username.data
-        user.email = form.email.data
-        user.image_url = form.image_url.data
         if User.authenticate(form.username.data, form.password.data):
-            editted_user = User(username=user.username, 
-                                email=user.email, 
-                                image_url=form.image_url.data or User.image_url.default.arg
-                                )
+            user.username = form.username.data
+            user.email = form.email.data
+            user.image_url = form.image_url.data or "/static/images/default-pic.png"
+        
             db.session.commit()
             return redirect(f'/users/{g.user.id}')
         else:
@@ -308,13 +305,10 @@ def homepage():
     - anon users: no messages
     - logged in: 100 most recent messages of followed_users
     """
+    following_ids = [f.id for f in g.user.following] + [g.user.id]
 
     if g.user:
-        messages = (Message
-                    .query
-                    .order_by(Message.timestamp.desc())
-                    .limit(100)
-                    .all())
+        messages = Message.query.filter(Message.user_id.in_(following_ids)).order_by(Message.timestamp.desc()).limit(100).all()
 
         return render_template('home.html', messages=messages)
 
