@@ -1,6 +1,6 @@
 import os
 
-from flask import Flask, render_template, request, flash, redirect, session, g
+from flask import Flask, render_template, request, flash, redirect, session, g, abort
 from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError
 
@@ -244,29 +244,31 @@ def delete_user():
 
     return redirect("/signup")
 
-@app.route('/users/add_like/<int:message_id>', methods= ["GET, POST"])
-def add_like(message_id):
-    user = g.user.likes.query.get_or_404(id)
 
+@app.route('/users/show_like/<int:user_id>', methods=["GET"])
+def show_likes(user_id):
     if not g.user:
         flash("Access unauthorized.", "danger")
         return redirect("/")
 
+    user = User.query.get_or_404(user_id)
+    return render_template('users/likes.html', user=user, likes=user.likes)
+
+@app.route('/users/add_like/<int:message_id>', methods=["POST"])
+def add_like(message_id):
+    user_likes = g.user.likes
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
     liked_message = Message.query.get_or_404(message_id)
     if liked_message.user_id == g.user.id:
         return abort(403)
-
-    user_likes = g.user.likes
-
     if liked_message in user_likes: #if message is already liked by user then go else
-        g.user.likes = [like for like in user_likes if like != liked_message] #for every like that the user likes, return that like, if that like is not in (liked) message database
+        g.user.likes = [like for like in user_likes if like != liked_message] #unlike
     else: #if not: put it with our likes page
         g.user.likes.append(liked_message)
-
     db.session.commit()
-
     return redirect("/")
-    return render_template('users/likes.html', user=user, likes=user.likes)
 
 ##############################################################################
 # Messages routes:
@@ -333,7 +335,9 @@ def homepage():
     if g.user:
         messages = Message.query.filter(Message.user_id.in_(following_ids)).order_by(Message.timestamp.desc()).limit(100).all()
 
-        return render_template('home.html', messages=messages)
+        liked_msg_ids = [msg.id for msg in g.user.likes]
+
+        return render_template('home.html', messages=messages, likes=liked_msg_ids)
 
     else:
         return render_template('home-anon.html')
